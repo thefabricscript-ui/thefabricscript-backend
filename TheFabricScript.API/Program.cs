@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
+using TheFabricScript.API.Filters;
+using TheFabricScript.API.Middleware;
 using TheFabricScript.Core.Interfaces;
 using TheFabricScript.Infrastructure.Data;
 using TheFabricScript.Infrastructure.Repositories;
@@ -138,6 +140,12 @@ builder.Services.AddSwaggerGen(c =>
     // Order controllers alphabetically in Swagger UI
     c.TagActionsBy(api => new[] { api.GroupName ?? api.ActionDescriptor.RouteValues["controller"] });
     c.DocInclusionPredicate((_, _) => true);
+
+    // Add standard error responses + deprecation notices to all operations
+    c.OperationFilter<SwaggerDefaultValues>();
+
+    // Enable annotations support (e.g. [SwaggerOperation])
+    c.EnableAnnotations();
 });
 
 builder.Services.AddControllers();
@@ -145,6 +153,11 @@ builder.Services.AddControllers();
 var app = builder.Build();
 
 // ── Middleware Pipeline ───────────────────────────────────
+
+// Global exception handler — always on (catches unhandled exceptions in all envs)
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// Swagger — available in Development only
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -152,6 +165,13 @@ if (app.Environment.IsDevelopment())
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "The Fabric Script API v1");
         c.RoutePrefix = "swagger";
+        c.DocumentTitle = "The Fabric Script API";
+        c.DefaultModelsExpandDepth(1);
+        c.DefaultModelRendering(Swashbuckle.AspNetCore.SwaggerUI.ModelRendering.Example);
+        c.DisplayRequestDuration();       // shows how long each request takes
+        c.EnableDeepLinking();            // bookmarkable operation URLs
+        c.EnableFilter();                 // search/filter endpoints in UI
+        c.EnableTryItOutByDefault();      // "Try it out" open by default
     });
 }
 
